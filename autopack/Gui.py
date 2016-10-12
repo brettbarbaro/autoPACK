@@ -97,7 +97,8 @@ global OS
 OS = os
 
 VERBOSE = 0
-autopack.GMODE = "Simple"
+autopack.GMODE = "Debug" #bb changed 20160816
+
 
 '''the autopack import '''
 from autopack.ingr_ui import SphereTreeUI
@@ -1034,6 +1035,7 @@ class AnalysisTab:
                                             self.afgui.histoVol.grid.masterGridPositions)
 
     def savedist_cb(self, filename):
+        print "savedist_cb"
         p = [0, 0, 0]
         o = self.afgui.getVal(self.widget["input_from"])
         if o != "None":
@@ -1046,6 +1048,7 @@ class AnalysisTab:
         self.aap.save_csv(d, filename)
 
     def savedist(self, ):
+        print "savedist"
         self.fileDialog(label="choose a file", callback=self.savedist_cb)
 
     def saveclosestdist_cb(self, filename):
@@ -1246,7 +1249,7 @@ class SubdialogFiller(uiadaptor):
                     self.Widget["options"][option] = self._addElemt(name='dosph', width=100, height=10,
                                                                     action=self.buildPrimitive, type="checkbox",
                                                                     icon=None, label="Show sphereTree primitives",
-                                                                    variable=self.addVariable("int", 0))
+                                                                    variable=self.addVariable("int", 1), value=1)
                 elif option == "forceBuild":
                     self.Widget["options"][option] = self._addElemt(name=self.recipe + "_forceBuildGrid",
                                                                     width=80, height=10, label="Rebuild the grid",
@@ -2243,6 +2246,7 @@ class SubdialogFiller(uiadaptor):
             pFill = self.getVal(self.Widget["options"]["prevFill"])
             pIngr = self.getVal(self.Widget["options"]["prevIngr"])
             doPts = self.getVal(self.Widget["options"]["gridPts"])
+            doSphere = self.getVal(self.Widget["options"]["spherePrimitive"])
         if self.guimode == "Debug":
             doSphere = self.getVal(self.Widget["options"]["spherePrimitive"])
         t1 = time()
@@ -2272,7 +2276,7 @@ class SubdialogFiller(uiadaptor):
         if self.gridresultfile is not None:
             if not os.path.isfile(self.gridresultfile) and not fbuild:
                 self.gridresultfile = None
-                fbuid = True
+                fbuild = True  # I think this was just a typo
         box = self.helper.getObject(bname)
         fbox_bb = None  # Graham Oct 20: Should we set fbox_bb = box here, then replace if fbox_name !=bname on next line?
         if fbox_name != bname:
@@ -2282,7 +2286,7 @@ class SubdialogFiller(uiadaptor):
                 self.afviewer.fbox_bb = fbox_bb
             # overwrite the option for display sphere and point using checkbox ?
         self.afviewer.doPoints = doPts  # self.getVal(self.doPoints) #self.getVal(self.points_display) if maya
-        self.afviewer.doSpheres = False  # doSphere
+        self.afviewer.doSpheres = doSphere
 
         if box is None:
             box = self.helper.getCurrentSelection()[0]
@@ -3644,7 +3648,7 @@ class AutoPackGui(uiadaptor):
 
         self.LABELGMODE = self._addElemt(label="GUI mode", width=100, height=5)
         self.LABELSV = self._addElemt(label="Welcome to autoPACK v" + autopack.__version__, width=100, height=5)
-        self.list_gmode = ["Simple", "Intermediate", "Advanced", "Debug"]
+        self.list_gmode = ["Debug", "Intermediate", "Advanced", "Simple"]
         self.gmode = self._addElemt(name="guimode",
                                     value=self.list_gmode,
                                     width=180, height=10, action=self.setGuiMod,
@@ -3740,9 +3744,9 @@ class AutoPackGui(uiadaptor):
         self.WidgetFiller = {}
         self.WidgetFiller["labelLoad"] = self._addElemt(name="labelLoadF",
                                                         label="Build an autoPACK/cellPACK recipe for:", width=120)
-        self.ListCurrentSetFiller = list(
-            self.recipe_available.keys())  # ["HIV_x_x","Synaptic_Vesicle","Cytoplasme","SimpleSpheres"]
-        self.ListCurrentSetFiller.append("Load")
+        self.ListCurrentSetFiller = ["Load"] +self.recipe_available.keys()
+#        self.ListCurrentSetFiller.append(  # this appends the whole list as a a single element - don't want that (bb 20160819)
+#            self.recipe_available.keys())  # ["HIV_x_x","Synaptic_Vesicle","Cytoplasme","SimpleSpheres"]
         self.ListCurrentSetFiller.append("Custom")
 
         self.WidgetFiller["labelRversion"] = self._addElemt(name="labelRversion",
@@ -3805,6 +3809,16 @@ class AutoPackGui(uiadaptor):
         if self.helper.host.find("blender") != -1:
             typeframe = "frame"
         self._layout = []
+
+        elemFrame = []
+        elemFrame.append([self.WidgetFiller["labelLoad"], self.WidgetFiller["menuscene"]])
+        elemFrame.append([self.WidgetFiller["labelRversion"], self.WidgetFiller["recipeversion"]])
+        elemFrame.append([self.WidgetFiller["forceFetch"]])
+        elemFrame.append([self.WidgetFiller["Startf"], self.WidgetFiller["labelstart"]])
+        frame = self._addLayout(id=196, name="Pack", elems=elemFrame, collapse=True,
+                                type=typeframe)  # tab is risky in DejaVu
+        self._layout.append(frame)
+
         elemFrame = []
         elemFrame.append([self.WidgetViewer["labelLoad"], self.WidgetViewer["menuscene"]])
         elemFrame.append([self.WidgetViewer["labelRversion"], self.WidgetViewer["recipeversion"]])
@@ -3816,15 +3830,6 @@ class AutoPackGui(uiadaptor):
 
         elemFrame.append([self.WidgetViewer["make"], self.WidgetViewer["labelmake"]])
         frame = self._addLayout(id=196, name="View", elems=elemFrame, collapse=True,
-                                type=typeframe)  # tab is risky in DejaVu
-        self._layout.append(frame)
-
-        elemFrame = []
-        elemFrame.append([self.WidgetFiller["labelLoad"], self.WidgetFiller["menuscene"]])
-        elemFrame.append([self.WidgetFiller["labelRversion"], self.WidgetFiller["recipeversion"]])
-        elemFrame.append([self.WidgetFiller["forceFetch"]])
-        elemFrame.append([self.WidgetFiller["Startf"], self.WidgetFiller["labelstart"]])
-        frame = self._addLayout(id=196, name="Pack", elems=elemFrame, collapse=True,
                                 type=typeframe)  # tab is risky in DejaVu
         self._layout.append(frame)
 

@@ -613,6 +613,7 @@ class AutopackViewer:
             self.vi.toggleDisplay(parent, True)
 
     def buildIngrPrimitive(self, ingr):
+        print ('running buildIngrPrimitive\n\n\n\n\n\n')
         o = ingr.recipe.compartment
         name = o.name + "_Spheres_" + ingr.name.replace(" ", "_")
         if self.ViewerType == 'dejavu':
@@ -651,7 +652,9 @@ class AutopackViewer:
                 #            pass
 
     def displayIngrSpheres(self, ingr, verts, radii, visible=1):
+        print('running displayIngrSpheres')
         o = ingr.recipe.compartment
+        print(ingr.name)
         if len(verts[ingr]):
             if ingr.modelType == 'Spheres':
                 name = o.name + "_Spheres_" + ingr.name.replace(" ", "_")
@@ -662,16 +665,22 @@ class AutopackViewer:
                     self.vi.AddObject(sph, parent=self.orgaToMasterGeom[ingr])
                     # print ingr.name, verts[ingr]
                 else:
+                    print(1)
                     parent = self.vi.getObject(name)
-                    names = self.histo.FillName[self.histo.cFill] + "S" + ingr.name.replace(" ", "_")
+                    names = ingr.name.replace(" ", "_")
                     if parent is None:
+                        print(2)
                         parent = self.vi.newEmpty(name, parent=self.orgaToMasterGeom[ingr])
                     #                        self.vi.AddObject(parent,parent=self.orgaToMasterGeom[ingr])
                     if not hasattr(ingr, 'isph') or ingr.isph is None:
+                        import random  # bb need this to generate random colors in subsequent line
+                        ingr.color = [random.random(), random.random(), random.random()]
+                        print(3)
                         ingr.isph = self.vi.instancesSphere(names, verts[ingr], radii[ingr],
                                                             self.pesph, [ingr.color], self.sc, parent=parent)
 
                     else:
+                        print(4)
                         self.vi.updateInstancesSphere(names, ingr.isph, verts[ingr],
                                                       radii[ingr], self.pesph, [ingr.color], self.sc,
                                                       parent=parent, delete=True)
