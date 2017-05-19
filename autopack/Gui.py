@@ -1249,7 +1249,7 @@ class SubdialogFiller(uiadaptor):
                     self.Widget["options"][option] = self._addElemt(name='dosph', width=100, height=10,
                                                                     action=self.buildPrimitive, type="checkbox",
                                                                     icon=None, label="Show sphereTree primitives",
-                                                                    variable=self.addVariable("int", 1), value=1)
+                                                                    variable=self.addVariable("int", 1), value=0)
                 elif option == "forceBuild":
                     self.Widget["options"][option] = self._addElemt(name=self.recipe + "_forceBuildGrid",
                                                                     width=80, height=10, label="Rebuild the grid",
@@ -3596,8 +3596,8 @@ class AutoPackGui(uiadaptor):
         #        from os.path import expanduser
         #        home = expanduser("~")
         regfile = os.path.join(AFwrkDir1, 'AP_registration')
-        if not os.path.exists(regfile):
-            return False
+        # if not os.path.exists(regfile):  # these two lines commented out by BB 20170518
+        #     return False                 # so I wouldn't have to deal with the registration box any more
         return True
 
     def checkRegistration(self):
