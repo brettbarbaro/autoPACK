@@ -1091,7 +1091,15 @@ class Environment(CompartmentList):
             "gradients": {"name": "gradients", "value": "", "values": [], "default": "", "type": "liste",
                           "description": "Gradients available", "width": 150},
             "innerGridMethod": {"name": "innerGridMethod", "value": "jordan3",
-                                "values": ["bhtree", "sdf", "jordan", "jordan3", "pyray", "floodfill", "binvox"],
+                                "values": ["bhtree", 
+#                                           "sdf", 
+                                           "jordan", 
+                                           "jordan3", 
+                                           "pyray", 
+                                           "floodfill", 
+#                                           "binvox",
+                                           "trimesh",
+                                           "scanline"],
                                 "default": "jordan3", "type": "liste",
                                 "description": "     Method to calculate the inner grid:", "width": 30},
             "overwritePlaceMethod": {"name": "overwritePlaceMethod", "value": True, "default": True, "type": "bool",
@@ -1195,7 +1203,7 @@ class Environment(CompartmentList):
                 ingr_partner = self.getIngrFromName(iname)
                 if ingr_partner is None:
                     continue
-                if len(ingr.partners_position):
+                if (i < len(ingr.partners_position)):
                     partner = ingr.addPartner(ingr_partner, weight=w,
                                               properties={"position": ingr.partners_position[i]})
                 else:
@@ -1274,6 +1282,14 @@ class Environment(CompartmentList):
         else:
             print("format output " + format_output + " not recognized (json,xml,python)")
 
+    def saveNewRecipe(self,filename):
+        from autopack.IOutils import serializedRecipe, saveResultBinary
+        djson, all_pos, all_rot = serializedRecipe(self,False,True)#transpose, use_quaternion, result=False, lefthand=False
+        with open(filename+"_serialized.json","w") as f:
+            f.write(djson)
+        saveResultBinary(self,filename+"_serialized.bin",False,True, lefthand=True)   
+        saveResultBinary(self,filename+"_serialized_tr.bin",True,True, lefthand=True)    #transpose, quaternio, left hand
+        
     def loadResult(self, resultfilename=None, restore_grid=True, backward=False, transpose=True):
         result = [], [], []
         if resultfilename == None:
@@ -1972,7 +1988,11 @@ class Environment(CompartmentList):
                 a, b = compartment.BuildGrid_kevin(self)
             elif self.innerGridMethod == "binvox" and compartment.isOrthogonalBoudingBox != 1:  # surfaces and interiors will be subtracted from it as normal!
                 a, b = compartment.BuildGrid_binvox(self)
-
+            elif self.innerGridMethod == "trimesh" and compartment.isOrthogonalBoudingBox != 1:  # surfaces and interiors will be subtracted from it as normal!
+                a, b = compartment.BuildGrid_trimesh(self)
+            elif self.innerGridMethod == "scanline" and compartment.isOrthogonalBoudingBox != 1:  # surfaces and interiors will be subtracted from it as normal!
+                a, b = compartment.BuildGrid_scanline(self)    
+                
             aInteriorGrids.append(a)
             print("I'm ruther in the loop")
             aSurfaceGrids.append(b)
@@ -3092,13 +3112,13 @@ class Environment(CompartmentList):
                 except:
                     #               p = ((float(t)-float(len(self.activeIngr)))/float(t))*100.
                     p = ((float(PlacedMols)) / float(
-                        totalNumMols))  # *100.    #This code shows 100% of ingredients all the time
+                        totalNumMols))*100.    #This code shows 100% of ingredients all the time
                     if self.afviewer is not None and hasattr(self.afviewer, "vi"):
                         self.afviewer.vi.progressBar(progress=int(p), label=ingr.name + " " + str(ingr.completion))
                         if self.afviewer.renderDistance:
                             self.afviewer.vi.displayParticleVolumeDistance(distance, self)
                     else:
-                        print '\r{} {} {} {}'.format(p, ingr.name, ingr.completion, nbFreePoints),
+                        print ('\r{} {} {} {}'.format(p, ingr.name, ingr.completion, nbFreePoints),)
                         # End C4D safety check for Status bar added July 10, 2012
             compNum = ingr.compNum
             radius = ingr.minRadius
@@ -3120,7 +3140,7 @@ class Environment(CompartmentList):
                                                               freePoints, nbFreePoints,
                                                               distance, compId, compNum, vRangeStart, vThreshStart])
             elif ingr.compNum > 0:
-                allSrfpts = self.compartments[ingr.compNum-1].surfacePointsNormals.keys()
+                allSrfpts = list(self.compartments[ingr.compNum-1].surfacePointsNormals.keys())
                 res = [True, allSrfpts[int(random() * len(allSrfpts))]]
             #  Replaced this with Sept 25, 2011 thesis version on July 5, 2012
             if verbose > 1:
@@ -4551,6 +4571,7 @@ class Environment(CompartmentList):
         if res_filename is None:
             res_filename = self.resultfile
         self.tem = tem_sim(res_filename, bounding_box=self.boundingBox)
+        self.tem.setup()
         self.collectResultPerIngredient()
         r = self.exteriorRecipe
         if r:
@@ -4569,7 +4590,6 @@ class Environment(CompartmentList):
             if ri:
                 for ingr in ri.ingredients:
                     self.tem.addAutoPackIngredient(ingr)
-
         self.tem.write()
 
     def exportToTEM(self, ):

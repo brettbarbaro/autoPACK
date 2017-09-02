@@ -188,6 +188,8 @@ KWDS = {
                      "description": "use sphere instead of cylinder for collision"},
     "properties": {"name": "properties", "value": {}, "default": {}, "min": 0., "max": 1.0, "type": "dic",
                    "description": "properties"},
+    "score":  {"type": "string"},
+    "organism":  {"type": "string"},
 }
 
 
@@ -623,8 +625,9 @@ class Agent:
         if "partners_name" in kw:
             self.partners_name = kw["partners_name"]
             if not self.partners_position:
-                for i in self.partners_name:
-                    self.partners_position.append([numpy.identity(4)])
+                if self.partners_name is not None:
+                    for i in self.partners_name:
+                        self.partners_position.append([numpy.identity(4)])
         self.excluded_partners_name = []
         if "excluded_partners_name" in kw:
             self.excluded_partners_name = kw["excluded_partners_name"]
@@ -1017,6 +1020,7 @@ class Ingredient(Agent):
                     # np.apply_along_axis(np.linalg.norm, 1, c)
                     self.encapsulatingRadius = max(
                         numpy.sqrt(numpy.einsum('ij,ij->i', positions, positions)))  # shoud be max distance
+                    self.minRadius =   self.encapsulatingRadius  
                     positions = [positions]
                     radii = [radii]
                 else:
@@ -1042,8 +1046,10 @@ class Ingredient(Agent):
                 self.encapsulatingRadius = max(radii[0])
         else:
             if radii is not None:
-                self.minRadius = min(radii[0])
-                self.encapsulatingRadius = max(radii[0])
+                delta = numpy.array(positions[0])
+                rM = sqrt(max(numpy.sum(delta * delta, 1)))
+                self.minRadius = rM
+                self.encapsulatingRadius = rM
                 #        print "sphereFile",sphereFile
                 #        print "positions",positions,len(positions)
                 #        print "rad",radii,len(radii)
@@ -1196,12 +1202,15 @@ class Ingredient(Agent):
         self.distances_temp = []
         self.centT = None  # transformed position
 
+        self.minRadius =   self.encapsulatingRadius  
+
         self.results = []
         #        if self.mesh is not None :
         #            self.getData()
         self.unique_id = Ingredient.static_id
         Ingredient.static_id += 1
-
+        self.score = ""
+        self.organism = ""
         # add tiling property ? as any ingredient coud tile as hexagon. It is just the packing type
         self.KWDS = {
             "overwrite_nbMol_value": {"type": "int", "name": "overwrite_nbMol_value", "default": 0, "value": 0,
@@ -1283,7 +1292,8 @@ class Ingredient(Agent):
                               "type": "float", "description": "proba_binding"},
             "properties": {"name": "properties", "value": {}, "default": {}, "min": 0., "max": 1.0, "type": "dic",
                            "description": "properties"},
-
+            "score":  {"type": "string"},
+            "organism":  {"type": "string"},
         }
         self.OPTIONS = {
             "molarity": {"type": "float", "name": "molarity", "default": 0, "value": 0, "min": 0, "max": 500,
@@ -1374,6 +1384,8 @@ class Ingredient(Agent):
             "partners_weight": {"name": "partners_weight", "type": "float", "value": "0.5"},
             "properties": {"name": "properties", "value": {}, "default": {}, "min": 0., "max": 1.0, "type": "dic",
                            "description": "properties"},
+            "score":  {"type": "string"},
+            "organism":  {"type": "string"},                           
         }
 
     def setTilling(self, comp):
@@ -2817,7 +2829,7 @@ class Ingredient(Agent):
     def oneJitter(self, spacing, trans, rotMat):
         #        spacing = histoVol.smallestProteinSize
         jx, jy, jz = self.jitterMax
-        jitter = self.getMaxJitter(spacing)
+        jitter = spacing/2.0#self.getMaxJitter(spacing)
         jitter2 = jitter * jitter
         compNum = self.compNum
         tx, ty, tz = trans
@@ -2832,7 +2844,7 @@ class Ingredient(Agent):
                 dy = jy * jitter * uniform(-1.0, 1.0)
                 dz = jz * jitter * uniform(-1.0, 1.0)
                 d2 = dx * dx + dy * dy + dz * dz
-                if d2 < jitter2:
+                if True:#d2 < jitter2:
                     if compNum > 0:  # jitter less among normal
                         # if self.name=='2uuh C4 SYNTHASE':
                         #    import pdb
@@ -3602,6 +3614,7 @@ class Ingredient(Agent):
         tx, ty, tz = translation
         dx, dy, dz, d2 = [0.0, 0.0, 0.0, 0.0]
         jitter_trans = [0.0, 0.0, 0.0]
+        jitter = jitter / 2.0 
         if jitter2 > 0.0:
             found = False
             while not found:
@@ -3609,7 +3622,7 @@ class Ingredient(Agent):
                 dy = jy * jitter * uniform(-1.0, 1.0)
                 dz = jz * jitter * uniform(-1.0, 1.0)
                 d2 = dx * dx + dy * dy + dz * dz
-                if d2 < jitter2:
+                if True:#d2 < jitter2:
                     if self.compNum > 0:  # jitter less among normal
                         dx, dy, dz, dum = numpy.dot(rotation, (dx, dy, dz, 0))
                     jitter_trans = (tx + dx, ty + dy, tz + dz)
@@ -3670,6 +3683,7 @@ class Ingredient(Agent):
         self.histoVol = histoVol
         rejectionCount = 0
         spacing = histoVol.smallestProteinSize
+        spacing = histoVol.grid.gridSpacing
         jx, jy, jz = self.jitterMax
         jitter = self.getMaxJitter(spacing)
         jitter2 = jitter * jitter
@@ -3905,6 +3919,7 @@ class Ingredient(Agent):
         spacing = histoVol.smallestProteinSize
         jx, jy, jz = self.jitterMax
         jitter = histoVol.callFunction(self.getMaxJitter, (spacing,))
+        jitter = histoVol.grid.gridSpacing
         jitter2 = jitter * jitter
 
         if self.compNum == 0:
@@ -4317,7 +4332,7 @@ class Ingredient(Agent):
         rejectionCount = 0
         spacing = histoVol.grid.gridSpacing  # /1.1547#  histoVol.smallestProteinSize
         jx, jy, jz = self.jitterMax
-        jitter = spacing  # histoVol.callFunction(self.getMaxJitter,(spacing,))
+        jitter = spacing/2.0  # histoVol.callFunction(self.getMaxJitter,(spacing,))
         jitter2 = jitter * jitter
 
         if self.compNum == 0:
@@ -4460,8 +4475,7 @@ class Ingredient(Agent):
         # jitter loop
         t1 = time()
         collision2 = False
-        for jitterPos in range(
-                self.nbJitter):  # This expensive Gauusian rejection system should not be the default should it?
+        for jitterPos in range(self.nbJitter):  # This expensive Gauusian rejection system should not be the default should it?
             if histoVol.ingrLookForNeighbours and self.packingMode == "closePartner":
                 bind = True
                 # print ("look for ingredient",trans)
@@ -4500,7 +4514,7 @@ class Ingredient(Agent):
                     dy = jy * jitter * uniform(-1.0, 1.0)
                     dz = jz * jitter * uniform(-1.0, 1.0)
                     d2 = dx * dx + dy * dy + dz * dz
-                    if d2 < jitter2:
+                    if True:#d2 < jitter2:
                         if compNum > 0:  # jitter less among normal
                             # if self.name=='2uuh C4 SYNTHASE':
                             #    import pdb
@@ -4812,7 +4826,7 @@ class Ingredient(Agent):
         rejectionCount = 0
         spacing = histoVol.grid.gridSpacing  # /1.1547#  histoVol.smallestProteinSize
         jx, jy, jz = self.jitterMax
-        jitter = spacing  # histoVol.callFunction(self.getMaxJitter,(spacing,))
+        jitter = spacing/2.0  # histoVol.callFunction(self.getMaxJitter,(spacing,))
         jitter2 = jitter * jitter
 
         if self.compNum == 0:
@@ -4971,7 +4985,7 @@ class Ingredient(Agent):
                     dy = jy * jitter * uniform(-1.0, 1.0)
                     dz = jz * jitter * uniform(-1.0, 1.0)
                     d2 = dx * dx + dy * dy + dz * dz
-                    if d2 < jitter2:
+                    if True:#d2 < jitter2:
                         if compNum > 0:  # jitter less among normal
                             # if self.name=='2uuh C4 SYNTHASE':
                             #    import pdb
@@ -5251,9 +5265,9 @@ class Ingredient(Agent):
             collideFunc = OdeUtil.collide
         afvi = histoVol.afviewer
         rejectionCount = 0
-        spacing = histoVol.smallestProteinSize
+        spacing = histoVol.grid.gridSpacing#smallestProteinSize
         jx, jy, jz = self.jitterMax
-        jitter = histoVol.callFunction(self.getMaxJitter, (spacing,))
+        jitter = spacing/2.0# histoVol.callFunction(self.getMaxJitter, (spacing,))
         jitter2 = jitter * jitter
 
         if self.compNum == 0:
@@ -5381,7 +5395,7 @@ class Ingredient(Agent):
                     dy = jy * jitter * uniform(-1.0, 1.0)
                     dz = jz * jitter * uniform(-1.0, 1.0)
                     d2 = dx * dx + dy * dy + dz * dz
-                    if d2 < jitter2:
+                    if True:#d2 < jitter2:
                         if compNum > 0:  # jitter less among normal
                             # if self.name=='2uuh C4 SYNTHASE':
                             #    import pdb
@@ -5752,7 +5766,7 @@ class Ingredient(Agent):
         rejectionCount = 0
         spacing = histoVol.grid.gridSpacing  # histoVol.smallestProteinSize#or the gridSpace?
         jx, jy, jz = self.jitterMax
-        jitter = spacing  # histoVol.callFunction(self.getMaxJitter,(spacing,))
+        jitter = spacing/2.0  # histoVol.callFunction(self.getMaxJitter,(spacing,))
         jitter2 = jitter * jitter
 
         if self.compNum == 0:
@@ -5878,7 +5892,7 @@ class Ingredient(Agent):
                     dy = jy * jitter * uniform(-1.0, 1.0)
                     dz = jz * jitter * uniform(-1.0, 1.0)
                     d2 = dx * dx + dy * dy + dz * dz
-                    if d2 < jitter2:
+                    if True:#d2 < jitter2:
                         if compNum > 0:  # jitter less among normal
                             # if self.name=='2uuh C4 SYNTHASE':
                             #    import pdb

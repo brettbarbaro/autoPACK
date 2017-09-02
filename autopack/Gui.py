@@ -1162,6 +1162,7 @@ class SubdialogFiller(uiadaptor):
         self.MENU_ID["File"] = [
                 self._addElemt(name="Save Recipe", action=self.save),
                 self._addElemt(name="Save Recipe as", action=self.saveas),  # self.buttonLoad},
+                self._addElemt(name="Save Recipe 2.0", action= self.save_new_recipe),
                 self._addElemt(name="Append to available recipe as", action=self.appendtoRECIPES),
                 self._addElemt(name="Save Result", action=self.saveResult),
                 self._addElemt(name="Save Grid", action=self.saveGrid),
@@ -1173,6 +1174,7 @@ class SubdialogFiller(uiadaptor):
                 self._addElemt(name="Export to BD_BOX flex", action=self.export_bd_flex),
                 self._addElemt(name="Load Result from BD_BOX", action=self.import_BDBOX),
                 self._addElemt(name="Simulate Fluorescence", action=self.generaeFluorescence),
+                self._addElemt(name="Export to TEM-Simulator rigid", action=self.export_tem_sim),                
             ]
             self.menuorder.append("Tools")
         self.menu = self.MENU_ID
@@ -1949,7 +1951,8 @@ class SubdialogFiller(uiadaptor):
                 else:
                     point = self.helper.getChilds(parent)
                     [self.helper.deleteObject(o) for o in point]
-
+        self.updateFinalNBMOLwidget()
+        
     def togleRecipeIngrInc(self, recipe, includeTog):
         if recipe:
             # should befor all ingredient available not only previously active
@@ -2190,6 +2193,18 @@ class SubdialogFiller(uiadaptor):
             if ingr is not None:
                 self.setVal(self.ingr_nMol[wkey], "%d" % (ingr.overwrite_nbMol_value))
                 self.setVal(self.ingr_molarity[wkey], "%d" % (ingr.molarity))
+                
+    def updateFinalNBMOLwidget(self, *args):
+        self.histoVol.collectResultPerIngredient()       
+        total = 0
+        totalF = 0
+        for wkey in self.ingr_vol_nbmol:
+            ingr = self.histoVol.getIngrFromName(wkey)
+            if ingr is not None:
+                self.setVal(self.ingr_vol_nbmol[wkey], "%d/%d" % (len(ingr.results),ingr.vol_nbmol))
+                total+=ingr.vol_nbmol
+                totalF+=len(ingr.results)
+        self.setVal(self.LABELS["totalNbMol"], "total: " +str(totalF)+"/"+str(total))
 
     def updateNBMOL(self, *args):
         bname = self.getVal(self.fbox_name)  # bbox_name)
@@ -2350,6 +2365,8 @@ class SubdialogFiller(uiadaptor):
                     [self.helper.deleteObject(o) for o in static]
         print ('time to display', time() - t2)
         self.helper.resetProgressBar()
+        
+        self.updateFinalNBMOLwidget()
         return True
 
     def AddGradient_cb(self, name):
@@ -2388,6 +2405,9 @@ class SubdialogFiller(uiadaptor):
     def saveRecipe(self, filename):
         self.histoVol.saveRecipe(filename, useXref=False, format_output="json")
 
+    def saveNewRecipe(self,filename):
+        self.histoVol.saveNewRecipe(filename)
+        
     def savexml(self, filename):
         self.histoVol.save_asXML(filename)
         self.setupfile = filename
@@ -2402,6 +2422,9 @@ class SubdialogFiller(uiadaptor):
     def saveas(self, *args):
         self.saveDialog(label="choose a json file", callback=self.saveRecipe)
 
+    def save_new_recipe(self,*args):
+        self.saveDialog(label="choose a filename",callback=self.saveNewRecipe)
+        
     def append2recipe(self, name, version="1.0"):
         n, v = name.split(" ")
         name = n
@@ -2455,6 +2478,12 @@ class SubdialogFiller(uiadaptor):
 
     def import_BDBOX(self, *args):
         self.fileDialog(label="choose a trajecory file (.dcd,.molb,.xyz)", callback=self.import_BDBOX_cb)
+
+    def export_tem_sim(self,*args):
+        self.saveDialog(label="export setup for TEM-Simulator", callback=self.export_tem_sim_cb)
+
+    def export_tem_sim_cb(self, filename):
+        self.histoVol.exportToTEM_SIM(res_filename=filename)
 
     def export_bd_rigid_cb(self, filename):
         self.histoVol.exportToBD_BOX(res_filename=filename, bd_type="rigid")
@@ -2692,6 +2721,12 @@ class SubdialogViewer(uiadaptor):
     def LoadNewResult(self, *args):
         self.fileDialog(label="choose an apr file", callback=self.LoadNewResult_cb)
 
+    def export_tem_sim(self,*args):
+        self.saveDialog(label="export setup for TEM-Simulator", callback=self.export_tem_sim_cb)
+
+    def export_tem_sim_cb(self, filename):
+        self.histoVol.exportToTEM_SIM(res_filename=filename)
+
     def export_bd_rigid_cb(self, filename):
         self.histoVol.exportToBD_BOX(res_filename=filename, bd_type="rigid")
 
@@ -2816,6 +2851,8 @@ class SubdialogViewer(uiadaptor):
                                                         action=self.export_bd_flex),
                                          self._addElemt(name="Load Result from BD_BOX", action=self.import_BDBOX),
                                          self._addElemt(name="Simulate Fluorescence", action=self.generaeFluorescence),
+                                         self._addElemt(name="Export Result to TEM-Simulator",
+                                                        action=self.export_tem_sim),
                                      ]
                                      }
         if self.helper.host.find("blender") != -1:
@@ -3620,8 +3657,11 @@ class AutoPackGui(uiadaptor):
         """
         # define button and other stuff here
         # need widget for viewer, filler, builder
-        self.menuorder = ["Help", "Edit"]
-        self._menu = self.MENU_ID = {"Help":
+        self.menuorder = [ "File", "Edit","Help"]
+        self._menu = self.MENU_ID = { "File":[
+                                        self._addElemt(name="Load a recipe", action=self.loadrecipe_ui),
+                                        ],
+                                      "Help":
                                          [self._addElemt(name="Check for stable updates", action=self.stdCheckUpdate),
                                           self._addElemt(name="Check for latest development updates",
                                                          action=self.devCheckUpdate),
@@ -4229,6 +4269,13 @@ Copyright: Graham Johnson ©2010
             self.loadxml(setupfile, recipe=recipe)
             return True
 
+    def loadrecipe_ui(self, *args):
+        # first need to call the ui fileDialog
+        try:
+            self.fileDialog(label="choose a file", callback=self.loadxml)
+        except:
+            print ("error")
+            
     def loadxml(self, filename, recipe=None):
         from autopack.Environment import Environment
         fileName, fileExtension = os.path.splitext(filename)
@@ -4237,6 +4284,7 @@ Copyright: Graham Johnson ©2010
             n = os.path.basename(fileName)
         self.histoVol[n] = Environment(name=n)
         recipe = n
+        print ("load recipe ",filename)
         self.histoVol[n].loadRecipe(filename)
         afviewer = AutopackViewer(ViewerType=self.helper.host, helper=self.helper)
         self.histoVol[n].name = n
@@ -4286,7 +4334,7 @@ Copyright: Graham Johnson ©2010
         if self.host.find("blender") != -1 or self.host == "c4d" or self.host == "maya":
             self.helper.instance_dupliFace = self.getVal(self.use_dupli_vert)
         if recipe == "Load":
-            self.fileDialog(label="choose a file", callback=self.loadxml)
+            #self.fileDialog(label="choose a file", callback=self.loadxml)
             self.Viewer_dialog(self.current_recipe, version=version)
             return
 
@@ -4327,10 +4375,15 @@ Copyright: Graham Johnson ©2010
         forceRecipe = self.getVal(self.WidgetViewer["forceFetchRecipe"])
         if self.host.find("blender") != -1 or self.host == "c4d" or self.host == "maya":
             self.helper.instance_dupliFace = self.getVal(self.use_dupli_vert)
-        #        print "drawSubsetFiller", recipe,version
+        print ("drawSubsetFiller", recipe,version)
         #        self.setVal(self.WidgetViewer["ShowUponLoad"])
         if recipe == "Load":
-            self.fileDialog(label="choose a xml file", callback=self.loadxml)
+#            try:
+#                self.fileDialog(label="choose a file", callback=self.loadxml)
+#            except:
+#                self.drawError()
+#            #self.fileDialog(label="load Recipe", callback=self.loadxml)
+            print ("loaded ?",self.current_recipe)
             self.Filler_dialog(self.current_recipe, version=version)
             return
 

@@ -10,7 +10,7 @@ import pickle
 import sys
 import autopack
 from autopack.Ingredient import GrowIngrediant, ActinIngrediant, KWDS
-from autopack.Serializable import sCompartment
+from autopack.Serializable import sCompartment;
 from autopack.Serializable import sIngredientGroup
 from autopack.Serializable import sIngredient
 from autopack.Serializable import sIngredientFiber
@@ -86,9 +86,11 @@ def setValueToXMLNode(value, node, attrname):
 
 def setValueToJsonNode(value, attrname):
     vdic = OrderedDict()
+    #print (attrname,type(attrname),value,type(value))
+    vdic[attrname] = None
     if value is None:
         print (attrname, " is None !")
-        return {attrname: None}
+        return vdic
     if attrname == "color":
         if type(value) != list and type(value) != tuple:
             if autopack.helper is not None:
@@ -98,14 +100,17 @@ def setValueToJsonNode(value, attrname):
     if type(value) == numpy.ndarray:
         value = value.tolist()
     elif type(value) == list or type(value) == tuple:
-        for i, v in enumerate(value):
-            if type(v) == numpy.ndarray:
-                value[i] = v.tolist()
-            elif type(v) == list or type(v) == tuple:
-                for j, va in enumerate(v):
-                    if type(va) == numpy.ndarray:
-                        v[j] = va.tolist()
-                        # node.setAttribute(attrname,str(value))
+        if len(value) == 0 :
+            return vdic
+        else :    
+            for i, v in enumerate(value):
+                if type(v) == numpy.ndarray:
+                    value[i] = v.tolist()
+                elif type(v) == list or type(v) == tuple:
+                    for j, va in enumerate(v):
+                        if type(va) == numpy.ndarray:
+                            v[j] = va.tolist()
+                            # node.setAttribute(attrname,str(value))
     vdic[attrname] = value
     return vdic
 
@@ -337,16 +342,16 @@ class IOingredientTool(object):
 
     def ingrJsonNode(self, ingr, result=False, kwds=None, transpose=False):
         # force position instead of sphereFile
-        ingdic = {}
+        ingdic = OrderedDict()
         if kwds == None:
             kwds = ingr.KWDS
         for k in kwds:
-            v = getattr(ingr, k)
+            v = getattr(ingr, str(k))
             #            if hasattr(v,"tolist"):
             #                v=v.tolist()
             #            ingdic[k] = v
             if type(v) != type(None):
-                ingdic.update(setValueToJsonNode(v, k))
+                ingdic.update(setValueToJsonNode(v, str(k)))
         # if sphereTree file present should not use the pos-radii keyword
         if ingr.sphereFile is not None and not result:
             # remove the position and radii key
@@ -465,6 +470,7 @@ def addCompartments(env, compdic, i, io_ingr):
         pos = numpy.array(compdic["positions"][n])  # Vec3
         rot = numpy.array(compdic["rotations"][n])  # quaternion
         # we only extract the compartments ferom the file
+        # order issue
         for cname in jsondic["compartments"]:
             comp_dic = jsondic["compartments"][cname]
             name = str(comp_dic["name"]) + "_" + str(i) + "_" + str(n)
@@ -527,6 +533,7 @@ def addCompartments(env, compdic, i, io_ingr):
                     # put here the export/import ?
 
 
+        
 def save_asJson(env, setupfile, useXref=True, indent=True):
     """
     Save the current environment setup as an json file.
@@ -541,48 +548,54 @@ def save_asJson(env, setupfile, useXref=True, indent=True):
         pathout = os.path.dirname(os.path.abspath(env.setupfile))
     if env.version is None:
         env.version = "1.0"
-    env.jsondic = OrderedDict({"recipe": {"name": env.name, "version": env.version}})
+    env.jsondic = OrderedDict()
+    env.jsondic["recipe"]=OrderedDict()
+    env.jsondic["recipe"]["name"]= env.name
+    env.jsondic["recipe"]["version"]= env.version
     if env.custom_paths:
         # this was the used path at loading time
         env.jsondic["recipe"]["paths"] = env.custom_paths
-    env.jsondic["options"] = {}
+    env.jsondic["options"] = OrderedDict()
     for k in env.OPTIONS:
-        v = getattr(env, k)
+        v = getattr(env, str(k))
         if k == "gradients":
             if type(env.gradients) is dict:
-                v = env.gradients.keys()
+                v = list(env.gradients.keys())
         #            elif k == "runTimeDisplay"
-        env.jsondic["options"].update(setValueToJsonNode(v, k))
+        env.jsondic["options"].update(setValueToJsonNode(v, str(k)))
     # add the boundin box
     env.jsondic["options"].update(setValueToJsonNode(env.boundingBox, "boundingBox"))
 
     # grid path information
     if env.grid is not None:
         if env.grid.filename is not None or env.grid.result_filename is not None:
-            env.jsondic["grid"] = {"grid_storage": str(env.grid.filename),
-                                   "grid_result": str(env.grid.result_filename)}
+            env.jsondic["grid"] = OrderedDict()
+            env.jsondic["grid"]["grid_storage"]=str(env.grid.filename)
+            env.jsondic["grid"]["grid_result"]= str(env.grid.result_filename)
 
     # gradient information
     if len(env.gradients):
-        env.jsondic["gradients"] = {}
+        env.jsondic["gradients"] = OrderedDict()
         for gname in env.gradients:
             g = env.gradients[gname]
-            env.jsondic["gradients"][str(g.name)] = {}
+            env.jsondic["gradients"][str(g.name)] = OrderedDict()
             for k in g.OPTIONS:
-                v = getattr(g, k)
-                env.jsondic["gradients"][str(g.name)].update(setValueToJsonNode(v, k))
+                v = getattr(g, str(k))
+                env.jsondic["gradients"][str(g.name)].update(setValueToJsonNode(v, str(k)))
 
     r = env.exteriorRecipe
     if r:
-        env.jsondic["cytoplasme"] = {}
-        env.jsondic["cytoplasme"]["ingredients"] = {}
+        env.jsondic["cytoplasme"] = OrderedDict()
+        env.jsondic["cytoplasme"]["ingredients"] = OrderedDict()
         for ingr in r.ingredients:
             if useXref:
                 # write the json file for this ingredient
                 io_ingr.write(ingr, pathout + os.sep + ingr.o_name, ingr_format="json")
                 # use reference file : str(pathout+os.sep+ingr.o_name+".json")
                 ing_filename = ingr.o_name + ".json"  # autopack.revertOnePath(pathout+os.sep+ingr.o_name+".json")
-                env.jsondic["cytoplasme"]["ingredients"][ingr.o_name] = {"name": ingr.o_name, "include": ing_filename}
+                env.jsondic["cytoplasme"]["ingredients"][ingr.o_name] = OrderedDict()
+                env.jsondic["cytoplasme"]["ingredients"][ingr.o_name]["name"]=ingr.o_name
+                env.jsondic["cytoplasme"]["ingredients"][ingr.o_name]["include"]= ing_filename
             else:
                 env.jsondic["cytoplasme"]["ingredients"][ingr.o_name] = io_ingr.ingrJsonNode(
                     ingr)  # {"name":ingr.o_name}
@@ -606,15 +619,16 @@ def save_asJson(env, setupfile, useXref=True, indent=True):
         #                fileName = None
         rs = o.surfaceRecipe
         if rs:
-            env.jsondic["compartments"][str(o.name)]["surface"] = {}
-            env.jsondic["compartments"][str(o.name)]["surface"]["ingredients"] = {}
+            env.jsondic["compartments"][str(o.name)]["surface"] =OrderedDict()
+            env.jsondic["compartments"][str(o.name)]["surface"]["ingredients"] = OrderedDict()
             for ingr in rs.ingredients:
                 if useXref:
                     # write the json file for this ingredient
                     io_ingr.write(ingr, pathout + os.sep + ingr.o_name, ingr_format="json")
                     # use reference file
-                    env.jsondic["compartments"][str(o.name)]["surface"]["ingredients"][ingr.o_name] = {
-                        "name": ingr.o_name, "include": str(ingr.o_name + ".json")}
+                    env.jsondic["compartments"][str(o.name)]["surface"]["ingredients"][ingr.o_name] = OrderedDict()
+                    env.jsondic["compartments"][str(o.name)]["surface"]["ingredients"][ingr.o_name]["name"]=ingr.o_name
+                    env.jsondic["compartments"][str(o.name)]["surface"]["ingredients"][ingr.o_name]["include"]= str(ingr.o_name + ".json")
                 else:
                     env.jsondic["compartments"][str(o.name)]["surface"]["ingredients"][
                         ingr.o_name] = io_ingr.ingrJsonNode(ingr)  # {"name":ingr.o_name}
@@ -626,15 +640,16 @@ def save_asJson(env, setupfile, useXref=True, indent=True):
                         "name"] = ingr.o_name
         ri = o.innerRecipe
         if ri:
-            env.jsondic["compartments"][str(o.name)]["interior"] = {}
-            env.jsondic["compartments"][str(o.name)]["interior"]["ingredients"] = {}
+            env.jsondic["compartments"][str(o.name)]["interior"] = OrderedDict()
+            env.jsondic["compartments"][str(o.name)]["interior"]["ingredients"] = OrderedDict()
             for ingr in ri.ingredients:
                 if useXref:
                     # write the json file for this ingredient
                     io_ingr.write(ingr, pathout + os.sep + ingr.o_name, ingr_format="json")
                     # use reference file
-                    env.jsondic["compartments"][str(o.name)]["interior"]["ingredients"][ingr.o_name] = {
-                        "name": ingr.o_name, "include": str(ingr.o_name + ".json")}
+                    env.jsondic["compartments"][str(o.name)]["interior"]["ingredients"][ingr.o_name] = OrderedDict()
+                    env.jsondic["compartments"][str(o.name)]["interior"]["ingredients"][ingr.o_name]["name"]=ingr.o_name
+                    env.jsondic["compartments"][str(o.name)]["interior"]["ingredients"][ingr.o_name]["include"]= str(ingr.o_name + ".json")
                 else:
                     env.jsondic["compartments"][str(o.name)]["interior"]["ingredients"][
                         ingr.o_name] = io_ingr.ingrJsonNode(ingr)  # {"name":ingr.o_name}
@@ -644,11 +659,17 @@ def save_asJson(env, setupfile, useXref=True, indent=True):
                     #                            env.jsondic["compartments"][str(o.name)]["interior"]["ingredients"][ingr.o_name].update(setValueToJsonNode(v,k))
                     env.jsondic["compartments"][str(o.name)]["interior"]["ingredients"][ingr.o_name][
                         "name"] = ingr.o_name
+#    if sys.version_info[0] >= 3:
+##        convert everything to OrderedDict
+
+    def default(o):
+        raise TypeError(repr(o) + " is not JSON serializable ",o,type(o))
+        
     with open(setupfile, 'w') as fp:  # doesnt work with symbol link ?
         if indent:
-            json.dump(env.jsondic, fp, indent=1, separators=(',', ':'))  # ,indent=4, separators=(',', ': ')
+            json.dump(env.jsondic, fp, indent=1, separators=(',', ':'),default=default)  # ,indent=4, separators=(',', ': ')
         else:
-            json.dump(env.jsondic, fp, separators=(',', ':'))  # ,indent=4, separators=(',', ': ')
+            json.dump(env.jsondic, fp, separators=(',', ':'),default=default)  # ,indent=4, separators=(',', ': ')
     print ("recipe saved to ", setupfile)
 
 
@@ -680,7 +701,7 @@ def save_Mixed_asJson(env, setupfile, useXref=True, kwds=None, result=False,
         for k in env.OPTIONS:
             v = getattr(env, k)
             if k == "gradients":
-                v = env.gradients.keys()
+                v = list(env.gradients.keys())
                 #            elif k == "runTimeDisplay"
             env.jsondic["options"].update(setValueToJsonNode(v, k))
         # add the boundin box
@@ -810,7 +831,7 @@ def save_asXML(env, setupfile, useXref=True):
     for k in env.OPTIONS:
         v = getattr(env, k)
         if k == "gradients":
-            v = env.gradients.keys()
+            v = list(env.gradients.keys())
         #            elif k == "runTimeDisplay"
         setValueToXMLNode(v, options, k)
     # add the boundin box
@@ -946,7 +967,7 @@ h1 = Environment()
     for k in env.OPTIONS:
         v = getattr(env, k)
         if k == "gradients":
-            v = env.gradients.keys()
+            v = list(env.gradients.keys())
         vstr = getStringValueOptions(v, k)  # env.setValueToXMLNode(v,options,k)
         setupStr += "h1.%s=%s\n" % (k, vstr)
     # add the boundin box
@@ -1032,6 +1053,15 @@ h1 = Environment()
     f.write(setupStr)
     f.close()
 
+
+def saveSphereTreeFile(h, ingr, filename):
+    wrkingdir = os.path.dirname(h.setupfile)
+    ingr.sphereFile = wrkingdir+os.sep+filename
+    nbLevels = len(ingr.positions)
+    nbLinker = 0
+    mapping = None
+    #use a graph ?
+    
 def checkRotFormat(rotation,transpose):
     if numpy.array(rotation).shape == (4,):
         if transpose:
@@ -1072,6 +1102,11 @@ def gatherResult(ingr_result, transpose, use_quaternion, type=0.0, lefthand=Fals
 
 
 def serializedRecipe(env, transpose, use_quaternion, result=False, lefthand=False):
+    #specify the  keyword ?
+    sCompartment.static_id = 0
+    sIngredientFiber.static_id = 0
+    sIngredient.static_id = [0, 0, 0]
+    sIngredientGroup.static_id= 0
     all_pos = []
     all_rot = []
     root = sCompartment("root")
@@ -1081,7 +1116,16 @@ def serializedRecipe(env, transpose, use_quaternion, result=False, lefthand=Fals
         proteins = None  # sIngredientGroup("proteins", 0)
         fibers = None  # sIngredientGroup("fibers", 1)
         for ingr in r.ingredients:
-            kwds = {"nbMol": len(ingr.results), "source": ingr.source}
+            nbmol = len(ingr.results)
+            if len(ingr.results)==0:
+                nbmol = ingr.nbMol
+            kwds = {"nbMol": nbmol, 
+                    "principalVector": ingr.principalVector,
+                    "molarity" : ingr.molarity,
+                    "source": ingr.source, 
+                    "positions":ingr.positions, 
+                    "radii":ingr.radii}
+                    #"sphereTree":ingr.sphereFile}
             if ingr.Type == "Grow":
                 if fibers is None:
                     fibers = sIngredientGroup("fibers", 1)
@@ -1109,7 +1153,16 @@ def serializedRecipe(env, transpose, use_quaternion, result=False, lefthand=Fals
             proteins = None  # sIngredientGroup("proteins", 0)
             fibers = None  # sIngredientGroup("fibers", 1)
             for ingr in rs.ingredients:
-                kwds = {"nbMol": len(ingr.results), "source": ingr.source}
+                nbmol = len(ingr.results)
+                if len(ingr.results)==0:
+                    nbmol = ingr.nbMol
+                kwds = {"nbMol": nbmol, 
+                        "principalVector": ingr.principalVector,
+                    "molarity" : ingr.molarity,
+                    "source": ingr.source, 
+                    "positions":ingr.positions, 
+                    "radii":ingr.radii}
+                    #"sphereTree":ingr.sphereFile}
                 if ingr.Type == "Grow":
                     if fibers is None:
                         fibers = sIngredientGroup("fibers", 1)
@@ -1135,7 +1188,16 @@ def serializedRecipe(env, transpose, use_quaternion, result=False, lefthand=Fals
             proteins = None  # sIngredientGroup("proteins", 0)
             fibers = None  # sIngredientGroup("fibers", 1)
             for ingr in ri.ingredients:
-                kwds = {"nbMol": len(ingr.results), "source": ingr.source}
+                nbmol = len(ingr.results)
+                if len(ingr.results)==0:
+                    nbmol = ingr.nbMol
+                kwds = {"nbMol": nbmol,  
+                    "principalVector": ingr.principalVector,
+                    "molarity" : ingr.molarity,
+                    "source": ingr.source, 
+                    "positions":ingr.positions, 
+                    "radii":ingr.radii}
+                    #"sphereTree":ingr.sphereFile}
                 if ingr.Type == "Grow":
                     if fibers is None:
                         fibers = sIngredientGroup("fibers", 1)
@@ -1192,64 +1254,69 @@ def serializedFromResult(env, transpose, use_quaternion, result=False, lefthand=
             exterior.addIngredientGroup(proteins)
 #        if fibers is not None:
 #            exterior.addIngredientGroup(fibers)
-    for o_name in env["compartments"]:
-        o =  env["compartments"][o_name]
-        co = sCompartment(o_name)
-        rs = o["surface"]
-        if rs:
-            surface = sCompartment("surface")
-            proteins = None  # sIngredientGroup("proteins", 0)
-            fibers = None  # sIngredientGroup("fibers", 1)
-            for ingr_name in rs["ingredients"]:
-                ingr = rs["ingredients"][ingr_name]
-                kwds = {"nbMol": len(ingr["results"]), "source": ingr["source"]}
-#                if ingr.Type == "Grow":
-#                    if fibers is None:
-#                        fibers = sIngredientGroup("fibers", 1)
-#                    igr = sIngredient(ingr.o_name, 1, **kwds)
-#                    fibers.addIngredient(igr)
-#                else:
-                if proteins is None:
-                    proteins = sIngredientGroup("proteins", 0)
-                igr = sIngredient(ingr["name"], 0, **kwds)
-                proteins.addIngredient(igr)
-                if result:
-                    ap, ar = gatherResult(ingr["results"], transpose, use_quaternion, type=igr.ingredient_id, lefthand=lefthand)
-                    all_pos.extend(ap)
-                    all_rot.extend(ar)
-            co.addCompartment(surface)
-            if proteins is not None:
-                surface.addIngredientGroup(proteins)
-#            if fibers is not None:
-#                surface.addIngredientGroup(fibers)
-        ri = o["interior"]
-        if ri:
-            interior = sCompartment("interior")
-            proteins = None  # sIngredientGroup("proteins", 0)
-            fibers = None  # sIngredientGroup("fibers", 1)
-            for ingr_name in ri["ingredients"]:
-                ingr = ri["ingredients"][ingr_name]
-                kwds = {"nbMol": len(ingr["results"]), "source": ingr["source"]}
-#                if ingr.Type == "Grow":
-#                    if fibers is None:
-#                        fibers = sIngredientGroup("fibers", 1)
-#                    igr = sIngredient(ingr["name"], 1, **kwds)
-#                    fibers.addIngredient(igr)
-#                else:
-                if proteins is None:
-                    proteins = sIngredientGroup("proteins", 0)
-                igr = sIngredient(ingr["name"], 0, **kwds)
-                proteins.addIngredient(igr)
-                if result:
-                    ap, ar = gatherResult(ingr["results"], transpose, use_quaternion, type=igr.ingredient_id, lefthand=lefthand)
-                    all_pos.extend(ap)
-                    all_rot.extend(ar)
-            co.addCompartment(interior)
-            if proteins is not None:
-                interior.addIngredientGroup(proteins)
-#            if fibers is not None:
-#                interior.addIngredientGroup(fibers)
-        root.addCompartment(co)
+    if "compartments" in env :
+        for o_name in env["compartments"]:
+            o =  env["compartments"][o_name]
+            co = sCompartment(o_name)
+            rs = None
+            if "surface" in o :
+                rs =   o["surface"]
+            if rs:
+                surface = sCompartment("surface")
+                proteins = None  # sIngredientGroup("proteins", 0)
+                fibers = None  # sIngredientGroup("fibers", 1)
+                for ingr_name in rs["ingredients"]:
+                    ingr = rs["ingredients"][ingr_name]
+                    kwds = {"nbMol": len(ingr["results"]), "source": ingr["source"]}
+    #                if ingr.Type == "Grow":
+    #                    if fibers is None:
+    #                        fibers = sIngredientGroup("fibers", 1)
+    #                    igr = sIngredient(ingr.o_name, 1, **kwds)
+    #                    fibers.addIngredient(igr)
+    #                else:
+                    if proteins is None:
+                        proteins = sIngredientGroup("proteins", 0)
+                    igr = sIngredient(ingr["name"], 0, **kwds)
+                    proteins.addIngredient(igr)
+                    if result:
+                        ap, ar = gatherResult(ingr["results"], transpose, use_quaternion, type=igr.ingredient_id, lefthand=lefthand)
+                        all_pos.extend(ap)
+                        all_rot.extend(ar)
+                co.addCompartment(surface)
+                if proteins is not None:
+                    surface.addIngredientGroup(proteins)
+    #            if fibers is not None:
+    #                surface.addIngredientGroup(fibers)
+            ri = None
+            if "interior" in o :
+                ri = o["interior"]
+            if ri:
+                interior = sCompartment("interior")
+                proteins = None  # sIngredientGroup("proteins", 0)
+                fibers = None  # sIngredientGroup("fibers", 1)
+                for ingr_name in ri["ingredients"]:
+                    ingr = ri["ingredients"][ingr_name]
+                    kwds = {"nbMol": len(ingr["results"]), "source": ingr["source"]}
+    #                if ingr.Type == "Grow":
+    #                    if fibers is None:
+    #                        fibers = sIngredientGroup("fibers", 1)
+    #                    igr = sIngredient(ingr["name"], 1, **kwds)
+    #                    fibers.addIngredient(igr)
+    #                else:
+                    if proteins is None:
+                        proteins = sIngredientGroup("proteins", 0)
+                    igr = sIngredient(ingr["name"], 0, **kwds)
+                    proteins.addIngredient(igr)
+                    if result:
+                        ap, ar = gatherResult(ingr["results"], transpose, use_quaternion, type=igr.ingredient_id, lefthand=lefthand)
+                        all_pos.extend(ap)
+                        all_rot.extend(ar)
+                co.addCompartment(interior)
+                if proteins is not None:
+                    interior.addIngredientGroup(proteins)
+    #            if fibers is not None:
+    #                interior.addIngredientGroup(fibers)
+            root.addCompartment(co)
     data_json = root.to_JSON()
     return data_json, all_pos, all_rot
     
@@ -1407,15 +1474,19 @@ def saveResultBinaryDic(env, filename, transpose, use_quaternion, lefthand=False
                 all_pos.extend(ap)
                 all_rot.extend(ar)
     # write allpos
-    numpy.array(all_pos, 'f').flatten().tofile(fptr)  # 4float position
-    numpy.array(all_rot, 'f').flatten().tofile(fptr)  # 4flaot quaternion
+    fptr.write(numpy.array(all_pos, 'f').flatten().tobytes())
+    fptr.write(numpy.array(all_rot, 'f').flatten().tobytes())
+    #numpy.array(all_pos, 'f').flatten().tofile(fptr)  # 4float position
+    #numpy.array(all_rot, 'f').flatten().tofile(fptr)  # 4flaot quaternion
     fptr.close()
     return all_pos, all_rot
  
 def toBinary(all_pos, all_rot,filename)   :
     fptr = open(filename, "wb")
-    numpy.array(all_pos, 'f').flatten().tofile(fptr)  # 4float position
-    numpy.array(all_rot, 'f').flatten().tofile(fptr)  # 4flaot quaternion
+    fptr.write(numpy.array(all_pos, 'f').flatten().tobytes())
+    fptr.write(numpy.array(all_rot, 'f').flatten().tobytes())
+#    numpy.array(all_pos, 'f').flatten().tofile(fptr)  # 4float position
+#    numpy.array(all_rot, 'f').flatten().tofile(fptr)  # 4flaot quaternion
     fptr.close()
     
 def saveResultBinary(env, filename, transpose, use_quaternion, lefthand=False):
@@ -1423,28 +1494,34 @@ def saveResultBinary(env, filename, transpose, use_quaternion, lefthand=False):
     all_pos = []
     all_rot = []
     fptr = open(filename, "wb")
+    uid = 0
     r = env.exteriorRecipe
     if r:
         for ingr in r.ingredients:
-            ap, ar = gatherResult(ingr.results, transpose, use_quaternion, lefthand=lefthand)
+            ap, ar = gatherResult(ingr.results, transpose, use_quaternion, lefthand=lefthand, type=uid)
             all_pos.extend(ap)
             all_rot.extend(ar)
+            uid+=1
     for o in env.compartments:
         rs = o.surfaceRecipe
         if rs:
             for ingr in rs.ingredients:
-                ap, ar = gatherResult(ingr.results, transpose, use_quaternion, lefthand=lefthand)
+                ap, ar = gatherResult(ingr.results, transpose, use_quaternion, lefthand=lefthand, type=uid)
                 all_pos.extend(ap)
                 all_rot.extend(ar)
+                uid+=1
         ri = o.innerRecipe
         if ri:
             for ingr in ri.ingredients:
-                ap, ar = gatherResult(ingr.results, transpose, use_quaternion, lefthand=lefthand)
+                ap, ar = gatherResult(ingr.results, transpose, use_quaternion, lefthand=lefthand, type=uid)
                 all_pos.extend(ap)
                 all_rot.extend(ar)
+                uid+=1
     # write allpos
-    numpy.array(all_pos, 'f').flatten().tofile(fptr)  # 4float position
-    numpy.array(all_rot, 'f').flatten().tofile(fptr)  # 4flaot quaternion
+    fptr.write(numpy.array(all_pos, 'f').flatten().tobytes())#?
+    fptr.write(numpy.array(all_rot, 'f').flatten().tobytes())
+#    numpy.array(all_pos, 'f').flatten().tofile(fptr)  # 4float position
+#    numpy.array(all_rot, 'f').flatten().tofile(fptr)  # 4flaot quaternion
     fptr.close()
 
 def getAllPosRot(env,transpose, use_quaternion, lefthand=False):
@@ -1684,13 +1761,19 @@ def setupFromJsonDic(env, ):
         if len(gridnode):
             env.grid_filename = str(gridnode["grid_storage"])
             env.grid_result_filename = str(gridnode["grid_result"])
+    sortkey = None
+    if (sys.version[0:3] < "3.0"):
+        sortkey = unicode.lower
+    else :
+        sortkey = str.lower
+ 
     if "cytoplasme" in env.jsondic:
         rnode = env.jsondic["cytoplasme"]
         ingrs_dic = env.jsondic["cytoplasme"]["ingredients"]
         if len(ingrs_dic):
             rCyto = Recipe()
             # sorted(numbers, key=str.lower)
-            for ing_name in sorted(ingrs_dic, key=unicode.lower):  # ingrs_dic:
+            for ing_name in sorted(ingrs_dic, key=sortkey):  # ingrs_dic:
                 # either xref or defined
                 ing_dic = ingrs_dic[ing_name]
                 ingr = io_ingr.makeIngredientFromJson(inode=ing_dic, recipe=env.name)
@@ -1712,6 +1795,9 @@ def setupFromJsonDic(env, ):
                 comp_dic = env.jsondic["compartments"][cname]
                 name = str(comp_dic["name"])
                 geom = str(comp_dic["geom"])
+                gname = name
+                if "gname" in comp_dic:
+                    gname = str(comp_dic["gname"])
                 rep = ""
                 if "rep" in comp_dic:
                     rep = str(comp_dic["rep"])
@@ -1719,7 +1805,7 @@ def setupFromJsonDic(env, ):
                 if "rep_file" in comp_dic:
                     rep_file = str(comp_dic["rep_file"])
                 print (
-                "rep ?", name, geom, rep, rep_file, (rep != "None" and len(rep) != 0 and rep != '' and rep == ""))
+                "rep ?", name, geom, gname, rep, rep_file, (rep != "None" and len(rep) != 0 and rep != '' and rep == ""))
                 #                print (len(rep),rep == '',rep=="",rep != "None",rep != "None" or len(rep) != 0)
                 if rep != "None" and len(rep) != 0 and rep != '' and rep != "":
                     rname = rep_file.split("/")[-1]
@@ -1734,8 +1820,8 @@ def setupFromJsonDic(env, ):
                     rep = None
                     rep_file = None
                     print ("NONENE")
-                print ("add compartment ", name, geom, rep, rep_file)
-                o = Compartment(name, None, None, None, filename=geom,
+                print ("add compartment ", name, geom, gname, rep, rep_file)
+                o = Compartment(name, None, None, None, gname=gname, filename=geom,
                                 object_name=rep, object_filename=rep_file)
                 print ("added compartment ", name)
                 env.addCompartment(o)
@@ -1745,7 +1831,7 @@ def setupFromJsonDic(env, ):
                     if len(ingrs_dic):
                         rSurf = Recipe(name="surf_" + str(len(env.compartments) - 1))
                         #                        rSurf = Recipe(name=o.name+"_surf")
-                        for ing_name in sorted(ingrs_dic, key=unicode.lower):  # ingrs_dic:
+                        for ing_name in sorted(ingrs_dic, key=sortkey):  # ingrs_dic:
                             # either xref or defined
                             ing_dic = ingrs_dic[ing_name]
                             ingr = io_ingr.makeIngredientFromJson(inode=ing_dic, recipe=env.name)
@@ -1758,7 +1844,7 @@ def setupFromJsonDic(env, ):
                     if len(ingrs_dic):
                         #                        rMatrix = Recipe(name=o.name+"_int")
                         rMatrix = Recipe(name="int_" + str(len(env.compartments) - 1))
-                        for ing_name in sorted(ingrs_dic, key=unicode.lower):  # ingrs_dic:
+                        for ing_name in sorted(ingrs_dic, key=sortkey):  # ingrs_dic:
                             # either xref or defined
                             ing_dic = ingrs_dic[ing_name]
                             ingr = io_ingr.makeIngredientFromJson(inode=ing_dic, recipe=env.name)

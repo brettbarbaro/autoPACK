@@ -4,6 +4,12 @@ import os
 
 sys.path.append("/home/ludo/Tools/mgltools_x86_64Linux2_latest/MGLToolsPckgs/")
 sys.path.append("/home/ludo/Tools/mgltools_x86_64Linux2_latest/MGLToolsPckgs/PIL/")
+#windows path
+#sys.path.append("C:\Users\ludov\AppData\Roaming\MAXON\CINEMA 4D R17_8DE13DAD\plugins\ePMV\mgl64\MGLToolsPckgs")
+#sys.path.append("C:\Users\ludov\AppData\Roaming\MAXON\CINEMA 4D R17_8DE13DAD\plugins\ePMV\mgl64\MGLToolsPckgs\PIL")
+
+sys.path.append("C:\Users\ludov\AppData\Roaming\MAXON\CINEMA 4D R17 Demo_E0A949BC\plugins\ePMV\mgl64\MGLToolsPckgs")
+sys.path.append("C:\Users\ludov\AppData\Roaming\MAXON\CINEMA 4D R17 Demo_E0A949BC\plugins\ePMV\mgl64\MGLToolsPckgs\PIL")
 
 import autopack
 
@@ -18,36 +24,82 @@ autopack.helper = helper
 from autopack.Environment import Environment
 #from autopack.Graphics import AutopackViewer as AFViewer
 
-filename = "/home/ludo/hivexp/BloodHIV1.0.json"
-path = "/home/ludo/hivexp/"
-fileName, fileExtension = os.path.splitext(filename)
+workingdir = "C:\Dev\IntegraseProject\\"
+recipefile = "HIV_IN_XP.json"
+resultfile = "INT_50_random_tr.json"
+
+workingdir = "C:\\Users\\ludov\\OneDrive\\Documents\\myRecipes\\"
+recipefile = "rbc1.json"
+resultfile = "rbc_result_tr.json"
+
+workingdir = "D:\\Data\\cellPAC_data\\cellPACK_database_1.1.0\\"
+recipefile ="recipes\\Mycoplasma1.6_full.json"
+resultfile = "results\\Mycoplasma1.6_full_result_1.json"
+
+workingdir = "D:\\Data\\cellPAC_data\\cellPACK_database_1.1.0\\"
+recipefile ="recipes\\Mycoplasma1.6_full.json"
+resultfile = "results\\Mycoplasma1.6_full_result_1.json"
+		
+  
+recipefile ="recipes\\BloodHIVMycoRB.1.0.json"
+resultfile = ""
+
+recipefile ="recipes\\Mycoplasma1.7.json"
+resultfile = ""
+
+recipefile ="recipes\\DNAplectoneme.1.0.json"
+
+recipefile ="recipes\\DNAplectoneme.1.0.json"
+
+recipefile ="D:\\Data\\cellPACK_data\\Mycoplasma\\Mpn_1.0.json"
+tr=""#"_tr"
+transpose = True
+resultfile ="D:\\Data\\cellPACK_data\\Mycoplasma\\Mpn_Results_H"+tr+".json"# or Tr
+workingdir ="D:\\Data\\cellPACK_data\\Mycoplasma\\"
+#workingdir ="C:\Users\ludov\OneDrive\Documents\cellVIEW-i\Data\\"
+#recipefile="christmas.json"
+
+fileName, fileExtension = os.path.splitext(recipefile)
 n=os.path.basename(fileName)
 h = Environment(name=n)
 #h.helper = helper
 recipe=n
-h.loadRecipe(filename)
-h.placeMethod = "pandaBullet"
-#h.resultfile = "/home/ludo/hivexp/pack_hiv_from_ncfix"
-#h.helper = helper
-#afviewer=None
-#print h,helper
-#setattr(h,"helper",helper)
-#afviewer = AFViewer(ViewerType=h.helper.host,helper=h.helper)
-#afviewer.SetHistoVol(h,20.0,display=False)
-#h.host=h.helper.host
-#previousresult = "/home/ludo/hivexp/BloodHIV1.0_mixed.json"
-#previousresult = "/home/ludo/hivexp/BloodHIV1.0_centered.json"
-#previousresult = "/home/ludo/hivexp/HIVCAfix.json"#good in c4d. transpose
-previousresult = "/home/ludo/hivexp/pack_hiv_from_ncfix.json"
-#previousresult = "/home/ludo/hivexp/pack_hiv_from_ncfix_tr.json"
-##prepare a file with only the CA
-## the ingredient order is not keep ?
-r=h.loadResult(previousresult,transpose=False)#for c4d transpose
-ingredients = h.restore(*r)
+h.loadRecipe(recipefile)
 
-from autopack.IOutils import serializedRecipe,saveResultBinary
-djson = serializedRecipe(h)
-f=open("/home/ludo/hivexp/pack_hiv_from_ncfix_serialized.json","w")
-f.write(djson)
-f.close()
-saveResultBinary(h,"/home/ludo/hivexp/pack_hiv_from_ncfix_serialized.bin",False,True)
+# save a full recipe no Xref
+#"nbMol": nbmol,  
+#"molarity" : ingr.molarity,
+#"source": ingr.source, 
+#"positions":ingr.positions, 
+#"radii":ingr.radii}
+
+rname=workingdir+"recipes\\BloodHIVMycoRB_full.1.0.json"
+rname=workingdir+"recipes\\Mycoplasma1.7.json"
+rname=workingdir+recipefile
+#h.saveRecipe(rname,useXref=False,mixed=True,
+#                     kwds=["source","name","nbMol","molarity","positions","radii"],result=True,
+#                   grid=False,packing_options=False,indent=False,quaternion=True)  
+if resultfile!= "" :
+    r=h.loadResult(resultfile,transpose=transpose)#for c4d transpose
+    ingredients = h.restore(*r)
+    h.saveRecipe("D:\\Data\\cellPACK_data\\Mycoplasma\\Mpn_Results_H_1.json",useXref=False,mixed=True, kwds=["source","name"],result=True, transpose = True,  grid=False,packing_options=False,indent=False,quaternion=True) 
+    h.saveRecipe("D:\\Data\\cellPACK_data\\Mycoplasma\\Mpn_Results_H_2.json",useXref=False,mixed=True, kwds=["source","name"],result=True, transpose = False, grid=False,packing_options=False,indent=False,quaternion=True)                            
+
+#                           
+##gagpol [0,0,-143.687] offset, pcpal 0,0,1
+from autopack.IOutils import serializedRecipe, saveResultBinary, toBinary
+djson, all_pos, all_rot = serializedRecipe(h,False,True,True,True)#transpose, use_quaternion, result=False, lefthand=False
+with open(workingdir+fileName+"_serialized.json","w") as f:
+    f.write(djson)
+if resultfile!= "" :
+    toBinary(all_pos, all_rot,"C:\\Users\\ludov\\OneDrive\\Documents\\OnlinePacking_Tobias\\cellVIEW-OP\\Data\\Mpn_1.0_serialized_L01"+tr+".bin")     
+#    #saveResultBinary(h,fileName+"_serialized.bin",False,True, lefthand=True)        
+#from autopack.Serializable import sCompartment,sIngredientGroup,sIngredient,sIngredientFiber
+#sCompartment.static_id = 0;sIngredientFiber.static_id = 0;sIngredient.static_id = [0, 0, 0];sIngredientGroup.static_id= 0;djson, all_pos, all_rot = serializedRecipe(h,True,True,True,True);toBinary(all_pos, all_rot,"C:\\Users\\ludov\\OneDrive\\Documents\\OnlinePacking_Tobias\\cellVIEW-OP\\Data\\Mpn_1.0_serializedTR_L"+tr+".bin")     
+#sCompartment.static_id = 0;sIngredientFiber.static_id = 0;sIngredient.static_id = [0, 0, 0];sIngredientGroup.static_id= 0;djson, all_pos, all_rot = serializedRecipe(h,False,True,True,True);toBinary(all_pos, all_rot,"C:\\Users\\ludov\\OneDrive\\Documents\\OnlinePacking_Tobias\\cellVIEW-OP\\Data\\Mpn_1.0_serialized_L"+tr+".bin")     
+#sCompartment.static_id = 0;sIngredientFiber.static_id = 0;sIngredient.static_id = [0, 0, 0];sIngredientGroup.static_id= 0;djson, all_pos, all_rot = serializedRecipe(h,False,True,True,False);toBinary(all_pos, all_rot,"C:\\Users\\ludov\\OneDrive\\Documents\\OnlinePacking_Tobias\\cellVIEW-OP\\Data\\Mpn_1.0_serialized"+tr+".bin")     
+#sCompartment.static_id = 0;sIngredientFiber.static_id = 0;sIngredient.static_id = [0, 0, 0];sIngredientGroup.static_id= 0;djson, all_pos, all_rot = serializedRecipe(h,True,True,True,False);toBinary(all_pos, all_rot,"C:\\Users\\ludov\\OneDrive\\Documents\\OnlinePacking_Tobias\\cellVIEW-OP\\Data\\Mpn_1.0_serializedTR"+tr+".bin")     
+#
+#
+#with open("C:\\Users\\ludov\\OneDrive\\Documents\\OnlinePacking_Tobias\\cellVIEW-OP\\Data\\Mpn_1.0_serialized.json","w") as f:
+#    f.write(djson)
