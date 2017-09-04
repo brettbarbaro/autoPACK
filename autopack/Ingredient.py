@@ -2561,7 +2561,7 @@ class Ingredient(Agent):
                         gridPointsCoords, distance, histoVol):
         """
         Check spheres for collision
-        TODO improve the testwhen grid stepSize is larger that size of the ingredient
+        TODO improve the test when grid stepSize is larger than size of the ingredient
         """
         print ("OK sphere compartment checking", self.compNum)
         centT = self.transformPoints(jtrans, rotMat, centers)  # this should be jtrans
